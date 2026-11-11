@@ -7,6 +7,9 @@ Unlike standard window lists, each menu sits horizontally side-by-side on the pa
 
 ---
 
+![image](https://raw.githubusercontent.com/Smith-Chris1/macAppMenu/refs/heads/main/macAppMenu.png)
+
+
 ## Features
 
 - **Active Application Title**: Displays the currently focused application's name (or "Finder" / "Desktop" when unfocused). Drops down to minimize, close, or quit all instances of the application.
