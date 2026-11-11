@@ -35,3 +35,33 @@ sudo apt update
 sudo apt install xdotool yelp
 ```
 
+## Installation
+
+~/.local/share/cinnamon/applets/macAppMenu@local/
+├── metadata.json
+├── applet.js
+├── stylesheet.css
+└── README.md
+
+## Enabling on the Panel
+Reload Cinnamon:
+Press Alt + F2, type r, and hit Enter (or run cinnamon --replace & in a terminal).
+
+## Add the Applet:
+
+Right-click an empty area of your top panel and select Applets.
+
+Stay on the Manage tab.
+
+Search for Mac App Menu.
+
+Select it and click the + (Add) button.
+
+Position (macOS Style):
+
+Right-click the panel and toggle Panel edit mode to ON.
+
+Drag the Mac App Menu to the far left of the top panel (next to the Mint Menu / Application Launcher).
+
+Right-click the panel and toggle Panel edit mode to OFF.
+
