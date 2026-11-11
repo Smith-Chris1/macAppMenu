@@ -40,44 +40,34 @@ class MacAppMenuApplet extends Applet.Applet {
     }
 
     _buildMenuBar() {
-        // 1. App Title
+        // 1. App Title Menu
         this.appBtn = this._createMenuButton("Finder");
-        this.appMenu = this._createAlignedMenu(this.appBtn);
-        this.appBtn.connect('clicked', () => {
-            this._toggleMenu(this.appMenu, () => this._populateAppMenu());
-        });
+        this.appMenu = this._createAlignedMenu(this.appBtn, () => this._populateAppMenu());
+        this.appBtn.connect('clicked', () => this.appMenu.toggle());
         this.box.add_actor(this.appBtn);
 
-        // 2. Edit
+        // 2. Edit Menu
         this.editBtn = this._createMenuButton("Edit");
-        this.editMenu = this._createAlignedMenu(this.editBtn);
-        this.editBtn.connect('clicked', () => {
-            this._toggleMenu(this.editMenu, () => this._populateEditMenu());
-        });
+        this.editMenu = this._createAlignedMenu(this.editBtn, () => this._populateEditMenu());
+        this.editBtn.connect('clicked', () => this.editMenu.toggle());
         this.box.add_actor(this.editBtn);
 
-        // 3. View
+        // 3. View Menu
         this.viewBtn = this._createMenuButton("View");
-        this.viewMenu = this._createAlignedMenu(this.viewBtn);
-        this.viewBtn.connect('clicked', () => {
-            this._toggleMenu(this.viewMenu, () => this._populateViewMenu());
-        });
+        this.viewMenu = this._createAlignedMenu(this.viewBtn, () => this._populateViewMenu());
+        this.viewBtn.connect('clicked', () => this.viewMenu.toggle());
         this.box.add_actor(this.viewBtn);
 
-        // 4. Window
+        // 4. Window Menu
         this.winBtn = this._createMenuButton("Window");
-        this.winMenu = this._createAlignedMenu(this.winBtn);
-        this.winBtn.connect('clicked', () => {
-            this._toggleMenu(this.winMenu, () => this._populateWindowMenu());
-        });
+        this.winMenu = this._createAlignedMenu(this.winBtn, () => this._populateWindowMenu());
+        this.winBtn.connect('clicked', () => this.winMenu.toggle());
         this.box.add_actor(this.winBtn);
 
-        // 5. Help
+        // 5. Help Menu
         this.helpBtn = this._createMenuButton("Help");
-        this.helpMenu = this._createAlignedMenu(this.helpBtn);
-        this.helpBtn.connect('clicked', () => {
-            this._toggleMenu(this.helpMenu, () => this._populateHelpMenu());
-        });
+        this.helpMenu = this._createAlignedMenu(this.helpBtn, () => this._populateHelpMenu());
+        this.helpBtn.connect('clicked', () => this.helpMenu.toggle());
         this.box.add_actor(this.helpBtn);
     }
 
@@ -98,7 +88,7 @@ class MacAppMenuApplet extends Applet.Applet {
         return btn;
     }
 
-    _createAlignedMenu(launcherBtn) {
+    _createAlignedMenu(launcherBtn, populateFn) {
         let menu = new PopupMenu.PopupMenu(launcherBtn, 0.0, this.orientation);
         menu.actor.add_style_class_name('applet-popup-menu');
         menu.actor.add_style_class_name('mac-flush-popup');
@@ -110,62 +100,80 @@ class MacAppMenuApplet extends Applet.Applet {
         }
         menu.actor.hide();
 
-        if (menu._boxPointer) {
-            let bp = menu._boxPointer;
+        let bp = menu._boxPointer;
+        if (bp) {
             bp.hideArrow = true;
 
-            bp._reposition = function(allocation, flags) {
-                if (!this._sourceActor || !this._sourceActor.get_stage()) return;
+            const enforcePosition = () => {
+                if (!bp._sourceActor || !bp._sourceActor.get_stage()) return;
 
-                let [sourceX, sourceY] = this._sourceActor.get_transformed_position();
-                let [, sourceHeight] = this._sourceActor.get_transformed_size();
+                let [sourceX, sourceY] = bp._sourceActor.get_transformed_position();
+                let [, sourceHeight] = bp._sourceActor.get_transformed_size();
 
-                let x = Math.round(sourceX);
-                let y = Math.round(sourceY + sourceHeight);
+                let targetX = Math.round(sourceX);
+                let targetY = Math.round(sourceY + sourceHeight);
 
-                let monitor = Main.layoutManager.findMonitorForActor(this._sourceActor);
+                let monitor = Main.layoutManager.findMonitorForActor(bp._sourceActor);
                 if (monitor) {
-                    if (x + this.actor.width > monitor.x + monitor.width) {
-                        x = monitor.x + monitor.width - this.actor.width;
+                    if (targetX + bp.actor.width > monitor.x + monitor.width) {
+                        targetX = monitor.x + monitor.width - bp.actor.width;
                     }
-                    if (x < monitor.x) {
-                        x = monitor.x;
+                    if (targetX < monitor.x) {
+                        targetX = monitor.x;
                     }
                 }
 
-                this.actor.set_position(x, y);
+                bp.actor.set_position(targetX, targetY);
             };
+
+            // Override internal BoxPointer routines completely
+            bp._reposition = enforcePosition;
+            bp.setPosition = function(sourceActor, alignment) {
+                enforcePosition();
+            };
+
+            // Clamp coordinate against animation frames modifying allocation
+            bp.actor.connect('notify::allocation', () => {
+                if (menu.isOpen) {
+                    enforcePosition();
+                }
+            });
         }
+
+        menu.connect('open-state-changed', (m, open) => {
+            if (open) {
+                this._syncCurrentState();
+                populateFn();
+                if (menu._boxPointer) {
+                    menu._boxPointer._reposition();
+                }
+            }
+        });
 
         this.menuManager.addMenu(menu);
         return menu;
     }
 
-    _toggleMenu(menu, populateFn) {
-        if (menu.isOpen) {
-            menu.close();
+    _syncCurrentState() {
+        let win = global.display.focus_window;
+        if (!win || win.is_override_redirect() || win.window_type === Meta.WindowType.DESKTOP) {
+            this.activeWindow = null;
         } else {
-            populateFn();
-            menu.open();
-            if (menu._boxPointer) {
-                menu._boxPointer._reposition();
-            }
+            this.activeWindow = win;
         }
     }
 
     _updateActiveApp() {
         try {
-            let win = global.display.focus_window;
+            this._syncCurrentState();
+            let win = this.activeWindow;
 
-            if (!win || win.is_override_redirect() || win.window_type === Meta.WindowType.DESKTOP) {
-                this.activeWindow = null;
+            if (!win) {
                 this._setAppLabel("Finder");
                 return;
             }
 
-            this.activeWindow = win;
             let app = this.tracker.get_window_app(win);
-
             if (app) {
                 this._setAppLabel(app.get_name());
             } else {
@@ -252,14 +260,14 @@ class MacAppMenuApplet extends Applet.Applet {
 
         if (app) {
             let appWindows = app.get_windows();
-            if (appWindows.length > 0) {
+            if (appWindows && appWindows.length > 0) {
                 this._addItem(this.winMenu, "Bring All to Front", () => {
                     appWindows.forEach(w => w.activate(global.get_current_time()));
                 });
                 this.winMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
                 appWindows.forEach(w => {
-                    let isCurrent = (w === win);
+                    let isCurrent = (win && w === win);
                     let wTitle = w.get_title() || "Untitled Window";
                     if (wTitle.length > 35) wTitle = wTitle.substring(0, 32) + "...";
                     let prefix = isCurrent ? "✓ " : "   ";
@@ -330,16 +338,16 @@ class MacAppMenuApplet extends Applet.Applet {
     }
 
     _resolveHelpTarget(app, win) {
-        if (!app) return "xdg-open [https://www.google.com](https://www.google.com)";
+        if (!app) return "xdg-open https://www.google.com";
         let id = app.get_id ? app.get_id() : "";
         let name = app.get_name().toLowerCase();
 
         if (id.includes("gnome") || id.includes("xed") || id.includes("nemo")) {
             let baseCmd = id.replace(".desktop", "");
-            return `bash -c "yelp help:${baseCmd} || xdg-open [https://google.com/search?q=$](https://google.com/search?q=$){encodeURIComponent(name + ' linux help documentation')}"`;
+            return `bash -c "yelp help:${baseCmd} || xdg-open https://google.com/search?q=${encodeURIComponent(name + ' linux help documentation')}"`;
         }
 
-        return `xdg-open "[https://www.google.com/search?q=$](https://www.google.com/search?q=$){encodeURIComponent(name + ' manual documentation')}"`;
+        return `xdg-open "https://www.google.com/search?q=${encodeURIComponent(name + ' manual documentation')}"`;
     }
 
     on_applet_removed_from_panel() {
