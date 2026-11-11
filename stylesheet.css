@@ -21,7 +21,10 @@
     padding: 0px !important;
 }
 
+.mac-flush-popup StBin,
 .mac-flush-popup .popup-menu-content {
     margin: 0px !important;
-    padding: 4px 0px !important;
+    padding-top: 4px !important;
+    padding-left: 0px !important;
+    text-align: left !important;
 }
