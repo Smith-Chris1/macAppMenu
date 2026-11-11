@@ -38,10 +38,10 @@ sudo apt install xdotool yelp
 ## Installation
 
 ~/.local/share/cinnamon/applets/macAppMenu@local/
-metadata.json
-applet.js
-stylesheet.css
-README.md
+- metadata.json
+- applet.js
+- stylesheet.css
+- README.md
 
 ## Enabling on the Panel
 Reload Cinnamon:
