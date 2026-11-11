@@ -57,7 +57,7 @@ Search for Mac App Menu.
 
 Select it and click the + (Add) button.
 
-Position (macOS Style):
+## Position (macOS Style):
 
 Right-click the panel and toggle Panel edit mode to ON.
 
