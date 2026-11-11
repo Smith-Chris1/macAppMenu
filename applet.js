@@ -6,6 +6,7 @@ const Cinnamon = imports.gi.Cinnamon;
 const Util = imports.misc.util;
 const Clutter = imports.gi.Clutter;
 const Main = imports.ui.main;
+const Mainloop = imports.mainloop;
 
 class MacAppMenuApplet extends Applet.Applet {
     constructor(orientation, panelHeight, instanceId) {
@@ -43,31 +44,31 @@ class MacAppMenuApplet extends Applet.Applet {
         // 1. App Title Menu
         this.appBtn = this._createMenuButton("Finder");
         this.appMenu = this._createAlignedMenu(this.appBtn, () => this._populateAppMenu());
-        this.appBtn.connect('clicked', () => this.appMenu.toggle());
+        this.appBtn.connect('clicked', () => this.appMenu.toggle(false));
         this.box.add_actor(this.appBtn);
 
         // 2. Edit Menu
         this.editBtn = this._createMenuButton("Edit");
         this.editMenu = this._createAlignedMenu(this.editBtn, () => this._populateEditMenu());
-        this.editBtn.connect('clicked', () => this.editMenu.toggle());
+        this.editBtn.connect('clicked', () => this.editMenu.toggle(false));
         this.box.add_actor(this.editBtn);
 
         // 3. View Menu
         this.viewBtn = this._createMenuButton("View");
         this.viewMenu = this._createAlignedMenu(this.viewBtn, () => this._populateViewMenu());
-        this.viewBtn.connect('clicked', () => this.viewMenu.toggle());
+        this.viewBtn.connect('clicked', () => this.viewMenu.toggle(false));
         this.box.add_actor(this.viewBtn);
 
         // 4. Window Menu
         this.winBtn = this._createMenuButton("Window");
         this.winMenu = this._createAlignedMenu(this.winBtn, () => this._populateWindowMenu());
-        this.winBtn.connect('clicked', () => this.winMenu.toggle());
+        this.winBtn.connect('clicked', () => this.winMenu.toggle(false));
         this.box.add_actor(this.winBtn);
 
         // 5. Help Menu
         this.helpBtn = this._createMenuButton("Help");
         this.helpMenu = this._createAlignedMenu(this.helpBtn, () => this._populateHelpMenu());
-        this.helpBtn.connect('clicked', () => this.helpMenu.toggle());
+        this.helpBtn.connect('clicked', () => this.helpMenu.toggle(false));
         this.box.add_actor(this.helpBtn);
     }
 
@@ -89,70 +90,46 @@ class MacAppMenuApplet extends Applet.Applet {
     }
 
     _createAlignedMenu(launcherBtn, populateFn) {
-        let menu = new PopupMenu.PopupMenu(launcherBtn, 0.0, this.orientation);
-        menu.actor.add_style_class_name('applet-popup-menu');
-        menu.actor.add_style_class_name('mac-flush-popup');
+    let menu = new PopupMenu.PopupMenu(launcherBtn, this.orientation);
+    menu.actor.add_style_class_name('applet-popup-menu');
+    menu.actor.add_style_class_name('mac-flush-popup');
 
-        if (Main.uiGroup.add_actor) {
-            Main.uiGroup.add_actor(menu.actor);
-        } else {
-            Main.uiGroup.add_child(menu.actor);
-        }
-        menu.actor.hide();
-
-        let bp = menu._boxPointer;
-        if (bp) {
-            bp.hideArrow = true;
-
-            const enforcePosition = () => {
-                if (!bp._sourceActor || !bp._sourceActor.get_stage()) return;
-
-                let [sourceX, sourceY] = bp._sourceActor.get_transformed_position();
-                let [, sourceHeight] = bp._sourceActor.get_transformed_size();
-
-                let targetX = Math.round(sourceX);
-                let targetY = Math.round(sourceY + sourceHeight);
-
-                let monitor = Main.layoutManager.findMonitorForActor(bp._sourceActor);
-                if (monitor) {
-                    if (targetX + bp.actor.width > monitor.x + monitor.width) {
-                        targetX = monitor.x + monitor.width - bp.actor.width;
-                    }
-                    if (targetX < monitor.x) {
-                        targetX = monitor.x;
-                    }
-                }
-
-                bp.actor.set_position(targetX, targetY);
-            };
-
-            // Override internal BoxPointer routines completely
-            bp._reposition = enforcePosition;
-            bp.setPosition = function(sourceActor, alignment) {
-                enforcePosition();
-            };
-
-            // Clamp coordinate against animation frames modifying allocation
-            bp.actor.connect('notify::allocation', () => {
-                if (menu.isOpen) {
-                    enforcePosition();
-                }
-            });
-        }
-
-        menu.connect('open-state-changed', (m, open) => {
-            if (open) {
-                this._syncCurrentState();
-                populateFn();
-                if (menu._boxPointer) {
-                    menu._boxPointer._reposition();
-                }
-            }
-        });
-
-        this.menuManager.addMenu(menu);
-        return menu;
+    if (Main.uiGroup.add_actor) {
+        Main.uiGroup.add_actor(menu.actor);
+    } else {
+        Main.uiGroup.add_child(menu.actor);
     }
+    menu.actor.hide();
+
+    // Keep Cinnamon's own Y placement, but force X to the button's left edge
+    if (typeof menu._calculatePosition === 'function') {
+        let origCalc = menu._calculatePosition.bind(menu);
+        menu._calculatePosition = (...args) => {
+            let result = origCalc(...args);
+            let [bx] = launcherBtn.get_transformed_position();
+            let x = Math.round(bx);
+
+            let monitor = Main.layoutManager.findMonitorForActor(launcherBtn);
+            if (monitor) {
+                let w = menu.actor.width;
+                x = Math.min(x, monitor.x + monitor.width - w);
+                x = Math.max(x, monitor.x);
+            }
+            result[0] = x;
+            return result;
+        };
+    }
+
+    menu.connect('open-state-changed', (m, open) => {
+        if (open) {
+            this._syncCurrentState();
+            populateFn();
+        }
+    });
+
+    this.menuManager.addMenu(menu);
+    return menu;
+}
 
     _syncCurrentState() {
         let win = global.display.focus_window;
