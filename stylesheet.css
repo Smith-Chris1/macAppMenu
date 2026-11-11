@@ -1,0 +1,27 @@
+.mac-applet-root {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+#macAppMenuBox {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+.mac-flush-popup {
+    -arrow-rise: 0px !important;
+    -boxpointer-gap: 0px !important;
+    margin: 0px !important;
+    padding: 0px !important;
+}
+
+.mac-flush-popup .popup-menu-content {
+    margin: 0px !important;
+    padding: 4px 0px !important;
+}
